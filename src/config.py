@@ -12,6 +12,7 @@ MAP_SIZE: tuple[int, int] = (3400, 2000)
 LIVES: int = 3
 MINES: int = 3
 TIME_LIMIT: int = 240
+FRAME_RATE: int = 30
 
 GA_POPULATION_SIZE: int = 42
 GA_GENERATION_GOAL: int = 10000

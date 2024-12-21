@@ -74,7 +74,7 @@ def fitness(ga_instance: pygad.GA, chromosome: Chromosome, solution_idx: int, ru
             "graphics_type": GraphicsType.Tkinter,
             "realtime_multiplier": 1,
             "graphics_obj": None,
-            "frequency": 30
+            "frequency": config.FRAME_RATE
         }
 
         game: KesslerGame
