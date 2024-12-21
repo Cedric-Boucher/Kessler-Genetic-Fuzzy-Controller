@@ -24,7 +24,7 @@ GA_NUMBER_OF_THREADS: int = 5 # number of threads/processes to use for GA
 
 GA_CHROMOSOME_LENGTH: int = 58
 
-GA_MODEL_FILE: str = "team_cam_controller"
+GA_MODEL_FILE: str = "diamond_pickaxe_controller"
 
 GA_STOP_FLAG_FILE: str = "safely_stop_genetic_learner.txt"
 
