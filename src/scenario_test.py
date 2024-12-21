@@ -5,11 +5,8 @@
 
 import time
 
-from kesslergame import Scenario, KesslerGame, GraphicsType, TrainerEnvironment
-from test_controller import TestController
-from team_cam_controller import TeamCAMController
-from graphics_both import GraphicsBoth
-import config as config
+from kesslergame import Scenario, KesslerGame, GraphicsType
+from diamond_pickaxe_controller import DiamondPickaxeController
 
 from typing import Any
 
@@ -34,14 +31,11 @@ game_settings: dict[str, Any] = {
     'frequency': 30
 }
 
-if (config.RUN_WITH_GRAPHICS):
-    game = KesslerGame(settings=game_settings)  # Use this to visualize the game scenario
-else:
-    game = TrainerEnvironment(settings=game_settings)  # Use this for max-speed, no-graphics simulation
+game = KesslerGame(settings=game_settings)  # Use this to visualize the game scenario
 
 # Evaluate the game
 pre: float = time.perf_counter()
-score, perf_data = game.run(scenario=my_test_scenario, controllers=[TeamCAMController()])
+score, perf_data = game.run(scenario=my_test_scenario, controllers=[DiamondPickaxeController()])
 
 # Print out some general info about the result
 print('Scenario eval time: {:.2f} seconds'.format(time.perf_counter()-pre))

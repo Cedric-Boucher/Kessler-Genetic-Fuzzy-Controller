@@ -3,7 +3,7 @@ from kesslergame.kessler_game import KesslerGame
 from kesslergame.scenario import Scenario
 from kesslergame.controller import KesslerController
 from kesslergame.team import Team
-from team_cam_controller import TeamCAMController
+from diamond_pickaxe_controller import DiamondPickaxeController
 from kesslergame.graphics import GraphicsType
 from kesslergame.kessler_game import TrainerEnvironment
 import config
@@ -52,7 +52,7 @@ def fitness_score_function(score: Score, scenario: Scenario) -> float:
 
     return fitness_score
 
-def fitness(ga_instance: pygad.GA, chromosome: Chromosome, solution_idx: int) -> float:
+def fitness(ga_instance: pygad.GA, chromosome: Chromosome, solution_idx: int, run_with_graphics: bool = False) -> float:
     """runs the controller with the given chromosome
     and returns a fitness score to be maximized
 
@@ -67,7 +67,7 @@ def fitness(ga_instance: pygad.GA, chromosome: Chromosome, solution_idx: int) ->
     final_fitness_score: float = 0
 
     for scenario in config.SCENARIOS:
-        controller: TeamCAMController = TeamCAMController(chromosome)
+        controller: DiamondPickaxeController = DiamondPickaxeController(chromosome)
 
         game_settings: dict[str, Any] = {
             "perf_tracker": True,
@@ -78,7 +78,7 @@ def fitness(ga_instance: pygad.GA, chromosome: Chromosome, solution_idx: int) ->
         }
 
         game: KesslerGame
-        if config.RUN_WITH_GRAPHICS:
+        if run_with_graphics:
             game = KesslerGame(settings = game_settings)
         else:
             game = TrainerEnvironment(settings = game_settings)
@@ -89,9 +89,12 @@ def fitness(ga_instance: pygad.GA, chromosome: Chromosome, solution_idx: int) ->
 
     final_fitness_score /= len(config.SCENARIOS)
 
-    print(f"iteration fitness: {final_fitness_score}")
+    print("iteration fitness: {:.2f}".format(final_fitness_score))
 
     return final_fitness_score
+
+def fitness_for_pygad(ga_instance: pygad.GA, chromosome: Chromosome, solution_idx: int) -> float:
+    return fitness(ga_instance, chromosome, solution_idx, run_with_graphics = False)
 
 def on_generation(ga_instance: pygad.GA):
     ga_instance.save(config.GA_MODEL_FILE)
@@ -125,25 +128,21 @@ def check_stop_flag() -> bool:
 def run_genetic_algorithm():
     create_stop_flag_file()
     if (
-        not config.GA_RESTART_FROM_SCRATCH
-        and os.path.exists(config.GA_MODEL_FILE+".pkl")
+        os.path.exists(config.GA_MODEL_FILE+".pkl")
         and os.path.isfile(config.GA_MODEL_FILE+".pkl")
     ):
         print("Continuing training from saved state")
         ga_instance: pygad.GA = pygad.load(config.GA_MODEL_FILE)
         # reset functions to prevent pickling error
-        ga_instance.fitness_func = fitness
+        ga_instance.fitness_func = fitness_for_pygad
         ga_instance.on_generation = on_generation
         print("Saved state loaded from file")
     else:
-        confirm: str = ""
-        while (confirm != "Y"):
-            confirm = input("are you sure you want to restart the training from scratch? (\"Y\" to continue)\n")
-        print("Restarting training from scratch")
+        print("Save file not found,\nRestarting training from scratch")
         ga_instance: pygad.GA = pygad.GA(
             num_generations=config.GA_GENERATION_GOAL,
             num_parents_mating=config.GA_NUMBER_OF_PARENTS,
-            fitness_func=fitness,
+            fitness_func=fitness_for_pygad,
             sol_per_pop=config.GA_POPULATION_SIZE,
             num_genes=config.GA_CHROMOSOME_LENGTH,
             on_generation=on_generation,
