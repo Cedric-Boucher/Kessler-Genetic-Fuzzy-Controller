@@ -814,6 +814,17 @@ class DiamondPickaxeController(KesslerController):
 
         asteroids = DiamondPickaxeController.__pop_doomed_asteroids(asteroids, bullets)
 
+        if len(asteroids) == 0:
+            # there are no more asteroids to target,
+            # the last remaining asteroid(s) have bullets heading towards them
+            thrust: float = 0
+            turn_rate: float = 0
+            fire: bool = False
+            drop_mine: bool = False
+
+            return thrust, turn_rate, fire, drop_mine
+
+        # there is at least one asteroid to target:
         ship_is_respawning: bool = ship_state["is_respawning"]
         ship_lives_remaining: int = ship_state["lives_remaining"]
         ship_position: tuple[float, float] = ship_state["position"]
