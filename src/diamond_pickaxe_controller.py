@@ -195,8 +195,8 @@ class DiamondPickaxeController(KesslerController):
         }
         ship_thrust_gene = self.__scale_gene(
             ship_thrust_gene,
-            self.__ship_turn_range[0],
-            self.__ship_turn_range[1]
+            self.__ship_thrust_range[0],
+            self.__ship_thrust_range[1]
         )
 
         start_gene_index = end_gene_index
