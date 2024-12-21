@@ -3,7 +3,7 @@ from kesslergame.kessler_game import KesslerGame
 from kesslergame.scenario import Scenario
 from kesslergame.controller import KesslerController
 from kesslergame.team import Team
-from team_cam_controller import TeamCAMController
+from diamond_pickaxe_controller import DiamondPickaxeController
 from kesslergame.graphics import GraphicsType
 from kesslergame.kessler_game import TrainerEnvironment
 import config
@@ -67,7 +67,7 @@ def fitness(ga_instance: pygad.GA, chromosome: Chromosome, solution_idx: int, ru
     final_fitness_score: float = 0
 
     for scenario in config.SCENARIOS:
-        controller: TeamCAMController = TeamCAMController(chromosome)
+        controller: DiamondPickaxeController = DiamondPickaxeController(chromosome)
 
         game_settings: dict[str, Any] = {
             "perf_tracker": True,

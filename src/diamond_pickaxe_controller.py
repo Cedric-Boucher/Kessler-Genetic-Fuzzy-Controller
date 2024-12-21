@@ -20,7 +20,7 @@ from gene import Gene
 from chromosome import Chromosome
 from converted_chromosome import ConvertedChromosome
 
-class TeamCAMController(KesslerController): 
+class DiamondPickaxeController(KesslerController): 
     def __init__(self, chromosome: Chromosome):
         self.__current_frame = 0
         self.__name: str = "Diamond Pickaxe"
@@ -1227,7 +1227,7 @@ class TeamCAMController(KesslerController):
             asteroid_position: tuple[float, float] = asteroid["position"]
             asteroid_velocity: tuple[float, float] = asteroid["velocity"]
 
-            asteroid_intercept = TeamCAMController.__calculate_intercept(
+            asteroid_intercept = DiamondPickaxeController.__calculate_intercept(
                 ship_position,
                 ship_velocity,
                 ship_radius,
