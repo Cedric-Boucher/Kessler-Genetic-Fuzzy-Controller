@@ -80,6 +80,31 @@ SCENARIOS: list[Scenario] = [
         seed = 69
     ),
     Scenario(
+        name = "Medium Scenario",
+        asteroid_states = [
+            {
+                "position": (random.randint(0, MAP_SIZE[0]), random.randint(0, MAP_SIZE[1])),
+                "speed": random.randint(-400, 400)
+            }
+            for _
+            in range(10)
+        ],
+        ship_states = [
+            {
+                "position": tuple([i/2 for i in MAP_SIZE]),
+                "angle": 90,
+                "lives": LIVES,
+                "team": 1,
+                "mines_remaining": MINES,
+            }
+        ],
+        map_size = MAP_SIZE,
+        time_limit = TIME_LIMIT,
+        ammo_limit_multiplier = 0,
+        stop_if_no_ammo = False,
+        seed = 42
+    ),
+    Scenario(
         name = "Hard Scenario",
         asteroid_states = [
             {
@@ -103,6 +128,31 @@ SCENARIOS: list[Scenario] = [
         ammo_limit_multiplier = 0,
         stop_if_no_ammo = False,
         seed = 420
+    ),
+    Scenario(
+        name = "Hard Scenario",
+        asteroid_states = [
+            {
+                "position": (random.randint(0, MAP_SIZE[0]), random.randint(0, MAP_SIZE[1])),
+                "speed": random.randint(-600, 600)
+            }
+            for _
+            in range(20)
+        ],
+        ship_states = [
+            {
+                "position": tuple([i/2 for i in MAP_SIZE]),
+                "angle": 90,
+                "lives": LIVES,
+                "team": 1,
+                "mines_remaining": MINES,
+            }
+        ],
+        map_size = MAP_SIZE,
+        time_limit = TIME_LIMIT,
+        ammo_limit_multiplier = 0,
+        stop_if_no_ammo = False,
+        seed = 69
     ),
     Scenario(
         name = "Very Hard Scenario",
