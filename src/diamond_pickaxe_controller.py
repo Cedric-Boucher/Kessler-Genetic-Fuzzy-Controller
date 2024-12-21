@@ -807,11 +807,12 @@ class DiamondPickaxeController(KesslerController):
         self.__ship_distance_from_nearest_edge_range = (0, min(game_map_size)/2)
         max_map_distance: float = sqrt(game_map_size[0]**2 + game_map_size[1]**2)
 
-        # TODO fix aim accuracy (make aiming / turning not fuzzy tbh)
         # TODO fix reason why ship doesn't drop mines before getting hit
-        # TODO calculate current on screen bullet asteroid collisions and pop those asteroids from the list of asteroids to potentially target... only for the smallest ones because of children
         bullets: list[dict[str, Any]] = game_state["bullets"]
-        # bullets have position, velocity, and heading
+        asteroids: list[dict[str, Any]] = game_state["asteroids"]
+        mines: list[dict[str, Any]] = game_state["mines"]
+
+        asteroids = DiamondPickaxeController.__pop_doomed_asteroids(asteroids, bullets)
 
         ship_is_respawning: bool = ship_state["is_respawning"]
         ship_lives_remaining: int = ship_state["lives_remaining"]
@@ -827,7 +828,6 @@ class DiamondPickaxeController(KesslerController):
 
         assert (stopping_distance >= 0)
 
-        mines: list[dict[str, Any]] = game_state["mines"]
         closest_mine_index: None | int = self.__find_closest_mine(ship_position, mines)
         closest_mine_distance: float
         closest_mine_remaining_time: float
@@ -841,7 +841,6 @@ class DiamondPickaxeController(KesslerController):
             closest_mine_distance = sqrt((ship_position[0] - mine_position[0])**2 + (ship_position[1] - mine_position[1])**2)
             closest_mine_remaining_time = mines[closest_mine_index]["remaining_time"]
 
-        asteroids: list[dict[str, Any]] = game_state["asteroids"]
         closest_asteroid_index: None | int = self.__find_closest_asteroid(ship_position, asteroids)
         assert (closest_asteroid_index is not None) # the game should have ended if there are no more asteroids
         closest_asteroid: dict[str, Any] = asteroids[closest_asteroid_index]
@@ -951,6 +950,58 @@ class DiamondPickaxeController(KesslerController):
         self.__current_frame +=1
 
         return thrust, turn_rate, fire, drop_mine
+
+    @staticmethod
+    def __pop_doomed_asteroids(
+        asteroids: list[dict[str, Any]],
+        bullets: list[dict[str, Any]]
+    ) -> list[dict[str, Any]]:
+        """
+        returns the list of asteroids in the same format as provided,
+        except that all asteroids that will be hit by bullets at some point in the future
+        are popped from that list
+        """
+        for bullet in bullets:
+            bullet_position: tuple[float, float] = bullet["position"]
+            bullet_velocity: tuple[float, float] = bullet["velocity"]
+            bullet_radius: float = 0
+            intercept_asteroid_index: int | None = None
+            minimum_intercept_time: float | None = None
+
+            for asteroid_index, asteroid in enumerate(asteroids):
+                asteroid_position: tuple[float, float] = asteroid["position"]
+                asteroid_velocity: tuple[float, float] = asteroid["velocity"]
+                asteroid_radius: float = asteroid["radius"]
+                asteroid_size: int = asteroid["size"]
+
+                output = DiamondPickaxeController.__calculate_intercept(
+                    bullet_position,
+                    bullet_velocity,
+                    bullet_radius,
+                    asteroid_position,
+                    asteroid_velocity,
+                    asteroid_radius
+                )
+                if output is None:
+                    continue # no intercept
+
+                if asteroid_size != 1:
+                    # asteroid will split into multiple when hit, so we cannot just pop it from the list
+                    asteroids[asteroid_index]["size"] -= 1 # subtract 1 from the size in case another bullet also hits this asteroid
+                    continue
+
+                intercept_position: tuple[float, float] = output[0]
+                intercept_time: float = output[2]
+                if (minimum_intercept_time is None or intercept_time < minimum_intercept_time):
+                    intercept_asteroid_index = asteroid_index
+                    minimum_intercept_time = intercept_time
+
+            if intercept_asteroid_index is None:
+                continue # no asteroid will be hit by this bullet
+            # the asteroid that will be hit by this bullet has been found
+            asteroids.pop(intercept_asteroid_index)
+
+        return asteroids
 
     @staticmethod
     def __calculate_bullet_intercept(
