@@ -888,6 +888,12 @@ class TeamCAMController(KesslerController):
         self.__ship_distance_from_nearest_edge_range = (0, min(game_map_size)/2)
         max_map_distance: float = sqrt(game_map_size[0]**2 + game_map_size[1]**2)
 
+        # TODO fix aim accuracy (make aiming / turning not fuzzy tbh)
+        # TODO fix reason why ship doesn't drop mines before getting hit
+        # TODO calculate current on screen bullet asteroid collisions and pop those asteroids from the list of asteroids to potentially target... only for the smallest ones because of children
+        bullets: list[dict[str, Any]] = game_state["bullets"]
+        # bullets have position, velocity, and heading
+
         ship_is_respawning: bool = ship_state["is_respawning"]
         ship_lives_remaining: int = ship_state["lives_remaining"]
         ship_position: tuple[float, float] = ship_state["position"]
