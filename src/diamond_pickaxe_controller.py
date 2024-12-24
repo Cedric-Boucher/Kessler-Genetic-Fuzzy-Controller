@@ -3,7 +3,7 @@
 # Dr. Scott Dick
 from typing import Dict, Tuple, Any
 from immutabledict import immutabledict
-from math import radians, degrees, sqrt, atan2, cos, pi
+from math import radians, degrees, sqrt, atan2, sin, cos, pi
 
 # Demonstration of a fuzzy tree-based controller for Kessler Game.
 # Please see the Kessler Game Development Guide by Dr. Scott Dick for a
@@ -36,8 +36,8 @@ class DiamondPickaxeController(KesslerController):
         self.__ship_stopping_distance: ctrl.Antecedent | None = None
         self.__closest_mine_distance: ctrl.Antecedent | None = None
         self.__closest_mine_remaining_time: ctrl.Antecedent | None = None
-        self.__closest_asteroid_distance: ctrl.Antecedent | None = None
-        self.__closest_asteroid_size: ctrl.Antecedent | None = None
+        self.__best_next_frame_asteroid_distance: ctrl.Antecedent | None = None
+        self.__best_next_frame_asteroid_size: ctrl.Antecedent | None = None
         self.__asteroid_selection: ctrl.Consequent | None = None
         self.__ship_fire: ctrl.Consequent | None = None
         self.__drop_mine: ctrl.Consequent | None = None
@@ -51,14 +51,14 @@ class DiamondPickaxeController(KesslerController):
 
         self.__greatest_threat_asteroid_threat_time_range: tuple[float, float] = (0, 100)
         self.__greatest_threat_asteroid_size_range: tuple[float, float] = (0, 4)
-        self.__closest_asteroid_size_range: tuple[float, float] = (0, 4)
+        self.__best_next_frame_asteroid_size_range: tuple[float, float] = (0, 4)
         self.__ship_distance_from_nearest_edge_range: tuple[float, float] = (0, 1) # gets set correctly on first iteration of game (once the map size is known)
         self.__target_ship_firing_heading_delta_range: tuple[float, float] = (-pi, pi) # Radians due to Python
         self.__ship_speed_range: tuple[float, float] = (-240, 240) # m/s
         self.__ship_stopping_distance_range: tuple[float, float] = (0, 60) # m
         self.__closest_mine_distance_range: tuple[float, float] = (0, 1000) # m
         self.__closest_mine_remaining_time_range: tuple[float, float] = (0, 100)
-        self.__closest_asteroid_distance_range: tuple[float, float] = (0, 1000) # m
+        self.__best_next_frame_asteroid_distance_range: tuple[float, float] = (0, 1000) # m
         self.__ship_turn_range: tuple[float, float] = (-180, 180) # Degrees due to Kessler
         self.__ship_fire_range: tuple[float, float] = (-1, 1)
         self.__ship_drop_mine_range: tuple[float, float] = (-1, 1)
@@ -120,22 +120,6 @@ class DiamondPickaxeController(KesslerController):
             target_ship_firing_heading_delta_gene,
             self.__target_ship_firing_heading_delta_range[0],
             self.__target_ship_firing_heading_delta_range[1]
-        )
-
-        start_gene_index = end_gene_index
-        genes_needed = 2
-        end_gene_index = start_gene_index + genes_needed
-        values: list[float] = chromosome_list[start_gene_index:end_gene_index]
-        values.extend([-0.01, 1.01])
-        values = sorted(values)
-        ship_fire_gene: Gene = { # type: ignore
-            "N": tuple(values[0:3]),
-            "Y": tuple(values[1:4])
-        }
-        ship_fire_gene = self.__scale_gene(
-            ship_fire_gene,
-            self.__ship_fire_range[0],
-            self.__ship_fire_range[1]
         )
 
         start_gene_index = end_gene_index
@@ -236,16 +220,16 @@ class DiamondPickaxeController(KesslerController):
         values: list[float] = chromosome_list[start_gene_index:end_gene_index]
         values.extend([-0.01, 1.01])
         values = sorted(values)
-        closest_asteroid_distance_gene: Gene = { # type: ignore
+        best_next_frame_asteroid_distance_gene: Gene = { # type: ignore
             "Z": tuple(values[0:3]),
             "PS": tuple(values[1:4]),
             "PM": tuple(values[2:5]),
             "PL": tuple(values[3:6])
         }
-        closest_asteroid_distance_gene = self.__scale_gene(
-            closest_asteroid_distance_gene,
-            self.__closest_asteroid_distance_range[0],
-            self.__closest_asteroid_distance_range[1]
+        best_next_frame_asteroid_distance_gene = self.__scale_gene(
+            best_next_frame_asteroid_distance_gene,
+            self.__best_next_frame_asteroid_distance_range[0],
+            self.__best_next_frame_asteroid_distance_range[1]
         )
 
         start_gene_index = end_gene_index
@@ -291,16 +275,16 @@ class DiamondPickaxeController(KesslerController):
         values: list[float] = chromosome_list[start_gene_index:end_gene_index]
         values.extend([-0.01, 1.01])
         values = sorted(values)
-        closest_asteroid_size_gene: Gene = { # type: ignore
+        best_next_frame_asteroid_size_gene: Gene = { # type: ignore
             "S": tuple(values[0:3]),
             "M": tuple(values[1:4]),
             "L": tuple(values[2:5]),
             "XL": tuple(values[3:6])
         }
-        closest_asteroid_size_gene = self.__scale_gene(
-            closest_asteroid_size_gene,
-            self.__closest_asteroid_size_range[0],
-            self.__closest_asteroid_size_range[1]
+        best_next_frame_asteroid_size_gene = self.__scale_gene(
+            best_next_frame_asteroid_size_gene,
+            self.__best_next_frame_asteroid_size_range[0],
+            self.__best_next_frame_asteroid_size_range[1]
         )
 
         start_gene_index = end_gene_index
@@ -358,13 +342,12 @@ class DiamondPickaxeController(KesslerController):
             "ship_speed": ship_speed_gene,
             "ship_stopping_distance": ship_stopping_distance_gene,
             "closest_mine_distance": closest_mine_distance_gene,
-            "closest_asteroid_distance": closest_asteroid_distance_gene,
+            "best_next_frame_asteroid_distance": best_next_frame_asteroid_distance_gene,
             "greatest_threat_asteroid_threat_time": greatest_threat_asteroid_threat_time_gene,
             "greatest_threat_asteroid_size": greatest_threat_asteroid_size_gene,
-            "closest_asteroid_size": closest_asteroid_size_gene,
+            "best_next_frame_asteroid_size": best_next_frame_asteroid_size_gene,
             "closest_mine_remaining_time": closest_mine_remaining_time_gene,
             "asteroid_selection": asteroid_selection_gene,
-            "ship_fire": ship_fire_gene,
             "drop_mine": drop_mine_gene,
             "ship_thrust": ship_thrust_gene,
             "ship_is_invincible": ship_is_invincible_gene
@@ -385,14 +368,13 @@ class DiamondPickaxeController(KesslerController):
         self.__ship_stopping_distance = ctrl.Antecedent(np.arange(self.__ship_stopping_distance_range[0], self.__ship_stopping_distance_range[1], 1), 'ship_stopping_distance')
         self.__closest_mine_distance = ctrl.Antecedent(np.arange(self.__closest_mine_distance_range[0], self.__closest_mine_distance_range[1], 1), 'closest_mine_distance')
         self.__closest_mine_remaining_time = ctrl.Antecedent(np.arange(self.__closest_mine_remaining_time_range[0], self.__closest_mine_remaining_time_range[1], 0.1), 'closest_mine_remaining_time')
-        self.__closest_asteroid_distance = ctrl.Antecedent(np.arange(self.__closest_asteroid_distance_range[0], self.__closest_asteroid_distance_range[1], 1), 'closest_asteroid_distance')
+        self.__best_next_frame_asteroid_distance = ctrl.Antecedent(np.arange(self.__best_next_frame_asteroid_distance_range[0], self.__best_next_frame_asteroid_distance_range[1], 1), 'best_next_frame_asteroid_distance')
         self.__greatest_threat_asteroid_threat_time = ctrl.Antecedent(np.arange(self.__greatest_threat_asteroid_threat_time_range[0], self.__greatest_threat_asteroid_threat_time_range[1], 0.01), 'greatest_threat_asteroid_threat_time')
         self.__greatest_threat_asteroid_size = ctrl.Antecedent(np.arange(self.__greatest_threat_asteroid_size_range[0], self.__greatest_threat_asteroid_size_range[1], 0.1), 'greatest_threat_asteroid_size')
-        self.__closest_asteroid_size = ctrl.Antecedent(np.arange(self.__closest_asteroid_size_range[0], self.__closest_asteroid_size_range[1], 0.1), 'closest_asteroid_size')
+        self.__best_next_frame_asteroid_size = ctrl.Antecedent(np.arange(self.__best_next_frame_asteroid_size_range[0], self.__best_next_frame_asteroid_size_range[1], 0.1), 'best_next_frame_asteroid_size')
         self.__ship_is_invincible = ctrl.Antecedent(np.arange(self.__ship_is_invincible_range[0], self.__ship_is_invincible_range[1], 0.1), 'ship_is_invincible')
 
         self.__asteroid_selection = ctrl.Consequent(np.arange(self.__asteroid_selection_range[0], self.__asteroid_selection_range[1], 0.1), 'asteroid_selection')
-        self.__ship_fire = ctrl.Consequent(np.arange(self.__ship_fire_range[0], self.__ship_fire_range[1], 0.1), 'ship_fire')
         self.__drop_mine = ctrl.Consequent(np.arange(self.__ship_drop_mine_range[0], self.__ship_drop_mine_range[1], 0.1), 'drop_mine')
         self.__ship_thrust = ctrl.Consequent(np.arange(self.__ship_thrust_range[0], self.__ship_thrust_range[1], 5), 'ship_thrust')
 
@@ -409,10 +391,9 @@ class DiamondPickaxeController(KesslerController):
         assert (self.__ship_stopping_distance is not None)
         assert (self.__closest_mine_distance is not None)
         assert (self.__closest_mine_remaining_time is not None)
-        assert (self.__closest_asteroid_distance is not None)
-        assert (self.__closest_asteroid_size is not None)
+        assert (self.__best_next_frame_asteroid_distance is not None)
+        assert (self.__best_next_frame_asteroid_size is not None)
         assert (self.__asteroid_selection is not None)
-        assert (self.__ship_fire is not None)
         assert (self.__drop_mine is not None)
         assert (self.__ship_thrust is not None)
         assert (self.__ship_is_invincible is not None)
@@ -431,11 +412,11 @@ class DiamondPickaxeController(KesslerController):
         self.__greatest_threat_asteroid_size['L'] = fuzz.trimf(self.__greatest_threat_asteroid_size.universe, greatest_threat_asteroid_size_gene["L"])
         self.__greatest_threat_asteroid_size['XL'] = fuzz.trimf(self.__greatest_threat_asteroid_size.universe, greatest_threat_asteroid_size_gene["XL"])
 
-        closest_asteroid_size_gene: Gene = self.__converted_chromosome["closest_asteroid_size"]
-        self.__closest_asteroid_size['S'] = fuzz.trimf(self.__closest_asteroid_size.universe, closest_asteroid_size_gene["S"])
-        self.__closest_asteroid_size['M'] = fuzz.trimf(self.__closest_asteroid_size.universe, closest_asteroid_size_gene["M"])
-        self.__closest_asteroid_size['L'] = fuzz.trimf(self.__closest_asteroid_size.universe, closest_asteroid_size_gene["L"])
-        self.__closest_asteroid_size['XL'] = fuzz.trimf(self.__closest_asteroid_size.universe, closest_asteroid_size_gene["XL"])
+        best_next_frame_asteroid_size_gene: Gene = self.__converted_chromosome["best_next_frame_asteroid_size"]
+        self.__best_next_frame_asteroid_size['S'] = fuzz.trimf(self.__best_next_frame_asteroid_size.universe, best_next_frame_asteroid_size_gene["S"])
+        self.__best_next_frame_asteroid_size['M'] = fuzz.trimf(self.__best_next_frame_asteroid_size.universe, best_next_frame_asteroid_size_gene["M"])
+        self.__best_next_frame_asteroid_size['L'] = fuzz.trimf(self.__best_next_frame_asteroid_size.universe, best_next_frame_asteroid_size_gene["L"])
+        self.__best_next_frame_asteroid_size['XL'] = fuzz.trimf(self.__best_next_frame_asteroid_size.universe, best_next_frame_asteroid_size_gene["XL"])
 
         ship_is_invincible_gene: Gene = self.__converted_chromosome["ship_is_invincible"]
         self.__ship_is_invincible['Y'] = fuzz.trimf(self.__ship_is_invincible.universe, ship_is_invincible_gene["Y"])
@@ -482,19 +463,15 @@ class DiamondPickaxeController(KesslerController):
         self.__closest_mine_remaining_time['M'] = fuzz.trimf(self.__closest_mine_remaining_time.universe, closest_mine_remaining_time_gene["M"])
         self.__closest_mine_remaining_time['L'] = fuzz.trimf(self.__closest_mine_remaining_time.universe, closest_mine_remaining_time_gene["L"])
 
-        closest_asteroid_distance_gene: Gene = self.__converted_chromosome["closest_asteroid_distance"]
-        self.__closest_asteroid_distance['Z']  = fuzz.trimf(self.__closest_asteroid_distance.universe, closest_asteroid_distance_gene["Z"])
-        self.__closest_asteroid_distance['PS'] = fuzz.trimf(self.__closest_asteroid_distance.universe, closest_asteroid_distance_gene["PS"])
-        self.__closest_asteroid_distance['PM'] = fuzz.trimf(self.__closest_asteroid_distance.universe, closest_asteroid_distance_gene["PM"])
-        self.__closest_asteroid_distance['PL'] = fuzz.trimf(self.__closest_asteroid_distance.universe, closest_asteroid_distance_gene["PL"])
+        best_next_frame_asteroid_distance_gene: Gene = self.__converted_chromosome["best_next_frame_asteroid_distance"]
+        self.__best_next_frame_asteroid_distance['Z']  = fuzz.trimf(self.__best_next_frame_asteroid_distance.universe, best_next_frame_asteroid_distance_gene["Z"])
+        self.__best_next_frame_asteroid_distance['PS'] = fuzz.trimf(self.__best_next_frame_asteroid_distance.universe, best_next_frame_asteroid_distance_gene["PS"])
+        self.__best_next_frame_asteroid_distance['PM'] = fuzz.trimf(self.__best_next_frame_asteroid_distance.universe, best_next_frame_asteroid_distance_gene["PM"])
+        self.__best_next_frame_asteroid_distance['PL'] = fuzz.trimf(self.__best_next_frame_asteroid_distance.universe, best_next_frame_asteroid_distance_gene["PL"])
 
         asteroid_selection_gene: Gene = self.__converted_chromosome["asteroid_selection"]
         self.__asteroid_selection['closest'] = fuzz.trimf(self.__asteroid_selection.universe, asteroid_selection_gene["closest"])
         self.__asteroid_selection['greatest_threat'] = fuzz.trimf(self.__asteroid_selection.universe, asteroid_selection_gene["greatest_threat"])
-
-        ship_fire_gene: Gene = self.__converted_chromosome["ship_fire"]
-        self.__ship_fire['N'] = fuzz.trimf(self.__ship_fire.universe, ship_fire_gene["N"])
-        self.__ship_fire['Y'] = fuzz.trimf(self.__ship_fire.universe, ship_fire_gene["Y"])
 
         drop_mine_gene: Gene = self.__converted_chromosome["drop_mine"]
         self.__drop_mine['N'] = fuzz.trimf(self.__drop_mine.universe, drop_mine_gene["N"])
@@ -519,10 +496,9 @@ class DiamondPickaxeController(KesslerController):
         assert (self.__ship_stopping_distance is not None)
         assert (self.__closest_mine_distance is not None)
         assert (self.__closest_mine_remaining_time is not None)
-        assert (self.__closest_asteroid_distance is not None)
-        assert (self.__closest_asteroid_size is not None)
+        assert (self.__best_next_frame_asteroid_distance is not None)
+        assert (self.__best_next_frame_asteroid_size is not None)
         assert (self.__asteroid_selection is not None)
-        assert (self.__ship_fire is not None)
         assert (self.__drop_mine is not None)
         assert (self.__ship_thrust is not None)
         assert (self.__ship_is_invincible is not None)
@@ -545,19 +521,19 @@ class DiamondPickaxeController(KesslerController):
                 self.__asteroid_selection['greatest_threat']
             ),
             ctrl.Rule(
-                self.__greatest_threat_asteroid_threat_time['S'] & self.__greatest_threat_asteroid_size['S'] & self.__closest_asteroid_size['S'],
+                self.__greatest_threat_asteroid_threat_time['S'] & self.__greatest_threat_asteroid_size['S'] & self.__best_next_frame_asteroid_size['S'],
                 self.__asteroid_selection['closest']
             ),
             ctrl.Rule(
-                self.__greatest_threat_asteroid_threat_time['S'] & self.__greatest_threat_asteroid_size['S'] & self.__closest_asteroid_size['M'],
+                self.__greatest_threat_asteroid_threat_time['S'] & self.__greatest_threat_asteroid_size['S'] & self.__best_next_frame_asteroid_size['M'],
                 self.__asteroid_selection['greatest_threat']
             ),
             ctrl.Rule(
-                self.__greatest_threat_asteroid_threat_time['S'] & self.__greatest_threat_asteroid_size['S'] & self.__closest_asteroid_size['L'],
+                self.__greatest_threat_asteroid_threat_time['S'] & self.__greatest_threat_asteroid_size['S'] & self.__best_next_frame_asteroid_size['L'],
                 self.__asteroid_selection['greatest_threat']
             ),
             ctrl.Rule(
-                self.__greatest_threat_asteroid_threat_time['S'] & self.__greatest_threat_asteroid_size['S'] & self.__closest_asteroid_size['XL'],
+                self.__greatest_threat_asteroid_threat_time['S'] & self.__greatest_threat_asteroid_size['S'] & self.__best_next_frame_asteroid_size['XL'],
                 self.__asteroid_selection['greatest_threat']
             ),
             ctrl.Rule(
@@ -573,35 +549,35 @@ class DiamondPickaxeController(KesslerController):
                 self.__asteroid_selection['greatest_threat']
             ),
             ctrl.Rule(
-                self.__greatest_threat_asteroid_threat_time['M'] & self.__greatest_threat_asteroid_size['S'] & self.__closest_asteroid_size['S'],
+                self.__greatest_threat_asteroid_threat_time['M'] & self.__greatest_threat_asteroid_size['S'] & self.__best_next_frame_asteroid_size['S'],
                 self.__asteroid_selection['closest']
             ),
             ctrl.Rule(
-                self.__greatest_threat_asteroid_threat_time['M'] & self.__greatest_threat_asteroid_size['S'] & self.__closest_asteroid_size['M'],
+                self.__greatest_threat_asteroid_threat_time['M'] & self.__greatest_threat_asteroid_size['S'] & self.__best_next_frame_asteroid_size['M'],
                 self.__asteroid_selection['greatest_threat']
             ),
             ctrl.Rule(
-                self.__greatest_threat_asteroid_threat_time['M'] & self.__greatest_threat_asteroid_size['S'] & self.__closest_asteroid_size['L'],
+                self.__greatest_threat_asteroid_threat_time['M'] & self.__greatest_threat_asteroid_size['S'] & self.__best_next_frame_asteroid_size['L'],
                 self.__asteroid_selection['greatest_threat']
             ),
             ctrl.Rule(
-                self.__greatest_threat_asteroid_threat_time['M'] & self.__greatest_threat_asteroid_size['S'] & self.__closest_asteroid_size['XL'],
+                self.__greatest_threat_asteroid_threat_time['M'] & self.__greatest_threat_asteroid_size['S'] & self.__best_next_frame_asteroid_size['XL'],
                 self.__asteroid_selection['greatest_threat']
             ),
             ctrl.Rule(
-                self.__greatest_threat_asteroid_threat_time['M'] & self.__greatest_threat_asteroid_size['M'] & self.__closest_asteroid_size['S'],
+                self.__greatest_threat_asteroid_threat_time['M'] & self.__greatest_threat_asteroid_size['M'] & self.__best_next_frame_asteroid_size['S'],
                 self.__asteroid_selection['closest']
             ),
             ctrl.Rule(
-                self.__greatest_threat_asteroid_threat_time['M'] & self.__greatest_threat_asteroid_size['M'] & self.__closest_asteroid_size['M'],
+                self.__greatest_threat_asteroid_threat_time['M'] & self.__greatest_threat_asteroid_size['M'] & self.__best_next_frame_asteroid_size['M'],
                 self.__asteroid_selection['closest']
             ),
             ctrl.Rule(
-                self.__greatest_threat_asteroid_threat_time['M'] & self.__greatest_threat_asteroid_size['M'] & self.__closest_asteroid_size['L'],
+                self.__greatest_threat_asteroid_threat_time['M'] & self.__greatest_threat_asteroid_size['M'] & self.__best_next_frame_asteroid_size['L'],
                 self.__asteroid_selection['greatest_threat']
             ),
             ctrl.Rule(
-                self.__greatest_threat_asteroid_threat_time['M'] & self.__greatest_threat_asteroid_size['M'] & self.__closest_asteroid_size['XL'],
+                self.__greatest_threat_asteroid_threat_time['M'] & self.__greatest_threat_asteroid_size['M'] & self.__best_next_frame_asteroid_size['XL'],
                 self.__asteroid_selection['greatest_threat']
             ),
             ctrl.Rule(
@@ -613,51 +589,51 @@ class DiamondPickaxeController(KesslerController):
                 self.__asteroid_selection['greatest_threat']
             ),
             ctrl.Rule(
-                self.__greatest_threat_asteroid_threat_time['L'] & self.__greatest_threat_asteroid_size['S'] & self.__closest_asteroid_size['S'],
+                self.__greatest_threat_asteroid_threat_time['L'] & self.__greatest_threat_asteroid_size['S'] & self.__best_next_frame_asteroid_size['S'],
                 self.__asteroid_selection['closest']
             ),
             ctrl.Rule(
-                self.__greatest_threat_asteroid_threat_time['L'] & self.__greatest_threat_asteroid_size['S'] & self.__closest_asteroid_size['M'],
+                self.__greatest_threat_asteroid_threat_time['L'] & self.__greatest_threat_asteroid_size['S'] & self.__best_next_frame_asteroid_size['M'],
                 self.__asteroid_selection['closest']
             ),
             ctrl.Rule(
-                self.__greatest_threat_asteroid_threat_time['L'] & self.__greatest_threat_asteroid_size['S'] & self.__closest_asteroid_size['L'],
+                self.__greatest_threat_asteroid_threat_time['L'] & self.__greatest_threat_asteroid_size['S'] & self.__best_next_frame_asteroid_size['L'],
                 self.__asteroid_selection['greatest_threat']
             ),
             ctrl.Rule(
-                self.__greatest_threat_asteroid_threat_time['L'] & self.__greatest_threat_asteroid_size['S'] & self.__closest_asteroid_size['XL'],
+                self.__greatest_threat_asteroid_threat_time['L'] & self.__greatest_threat_asteroid_size['S'] & self.__best_next_frame_asteroid_size['XL'],
                 self.__asteroid_selection['greatest_threat']
             ),
             ctrl.Rule(
-                self.__greatest_threat_asteroid_threat_time['L'] & self.__greatest_threat_asteroid_size['M'] & self.__closest_asteroid_size['S'],
+                self.__greatest_threat_asteroid_threat_time['L'] & self.__greatest_threat_asteroid_size['M'] & self.__best_next_frame_asteroid_size['S'],
                 self.__asteroid_selection['closest']
             ),
             ctrl.Rule(
-                self.__greatest_threat_asteroid_threat_time['L'] & self.__greatest_threat_asteroid_size['M'] & self.__closest_asteroid_size['M'],
+                self.__greatest_threat_asteroid_threat_time['L'] & self.__greatest_threat_asteroid_size['M'] & self.__best_next_frame_asteroid_size['M'],
                 self.__asteroid_selection['closest']
             ),
             ctrl.Rule(
-                self.__greatest_threat_asteroid_threat_time['L'] & self.__greatest_threat_asteroid_size['M'] & self.__closest_asteroid_size['L'],
+                self.__greatest_threat_asteroid_threat_time['L'] & self.__greatest_threat_asteroid_size['M'] & self.__best_next_frame_asteroid_size['L'],
                 self.__asteroid_selection['closest']
             ),
             ctrl.Rule(
-                self.__greatest_threat_asteroid_threat_time['L'] & self.__greatest_threat_asteroid_size['M'] & self.__closest_asteroid_size['XL'],
+                self.__greatest_threat_asteroid_threat_time['L'] & self.__greatest_threat_asteroid_size['M'] & self.__best_next_frame_asteroid_size['XL'],
                 self.__asteroid_selection['greatest_threat']
             ),
             ctrl.Rule(
-                self.__greatest_threat_asteroid_threat_time['L'] & self.__greatest_threat_asteroid_size['L'] & self.__closest_asteroid_size['S'],
+                self.__greatest_threat_asteroid_threat_time['L'] & self.__greatest_threat_asteroid_size['L'] & self.__best_next_frame_asteroid_size['S'],
                 self.__asteroid_selection['closest']
             ),
             ctrl.Rule(
-                self.__greatest_threat_asteroid_threat_time['L'] & self.__greatest_threat_asteroid_size['L'] & self.__closest_asteroid_size['M'],
+                self.__greatest_threat_asteroid_threat_time['L'] & self.__greatest_threat_asteroid_size['L'] & self.__best_next_frame_asteroid_size['M'],
                 self.__asteroid_selection['closest']
             ),
             ctrl.Rule(
-                self.__greatest_threat_asteroid_threat_time['L'] & self.__greatest_threat_asteroid_size['L'] & self.__closest_asteroid_size['L'],
+                self.__greatest_threat_asteroid_threat_time['L'] & self.__greatest_threat_asteroid_size['L'] & self.__best_next_frame_asteroid_size['L'],
                 self.__asteroid_selection['closest']
             ),
             ctrl.Rule(
-                self.__greatest_threat_asteroid_threat_time['L'] & self.__greatest_threat_asteroid_size['L'] & self.__closest_asteroid_size['XL'],
+                self.__greatest_threat_asteroid_threat_time['L'] & self.__greatest_threat_asteroid_size['L'] & self.__best_next_frame_asteroid_size['XL'],
                 self.__asteroid_selection['greatest_threat']
             ),
             ctrl.Rule(
@@ -679,21 +655,6 @@ class DiamondPickaxeController(KesslerController):
             ctrl.Rule(
                 self.__greatest_threat_asteroid_threat_time['XL'] & self.__greatest_threat_asteroid_size['XL'],
                 self.__asteroid_selection['closest']
-            )
-        ]
-
-        self.__ship_fire_fuzzy_rules = [
-            ctrl.Rule(
-                self.__ship_is_invincible['N'],
-                self.__ship_fire['Y']
-            ),
-            ctrl.Rule(
-                self.__ship_is_invincible['Y'] & (self.__greatest_threat_asteroid_threat_time['XS'] | self.__greatest_threat_asteroid_threat_time['S'] | self.__greatest_threat_asteroid_threat_time['M']),
-                self.__ship_fire['N']
-            ),
-            ctrl.Rule(
-                self.__ship_is_invincible['Y'] & (self.__greatest_threat_asteroid_threat_time['L'] | self.__greatest_threat_asteroid_threat_time['XL']),
-                self.__ship_fire['Y']
             )
         ]
 
@@ -762,20 +723,12 @@ class DiamondPickaxeController(KesslerController):
     def __setup_simulations(self) -> None:
         self.__setup_fuzzy_rules()
         assert (self.__asteroid_select_fuzzy_rules is not None)
-        assert (self.__ship_fire_fuzzy_rules is not None)
         assert (self.__drop_mine_fuzzy_rules is not None)
         assert (self.__ship_thrust_fuzzy_rules is not None)
 
         asteroid_select = ctrl.ControlSystem(self.__asteroid_select_fuzzy_rules)
         self.__asteroid_select_simulation = ctrl.ControlSystemSimulation(
             asteroid_select,
-            cache=config.USE_SIMULATION_CACHE,
-            flush_after_run=config.FLUSH_SIMULATION_CACHE_AFTER_RUN
-        )
-
-        ship_fire = ctrl.ControlSystem(self.__ship_fire_fuzzy_rules)
-        self.__ship_fire_simulation = ctrl.ControlSystemSimulation(
-            ship_fire,
             cache=config.USE_SIMULATION_CACHE,
             flush_after_run=config.FLUSH_SIMULATION_CACHE_AFTER_RUN
         )
@@ -799,7 +752,6 @@ class DiamondPickaxeController(KesslerController):
         Method processed each time step by this controller.
         """
         assert (self.__asteroid_select_simulation is not None)
-        assert (self.__ship_fire_simulation is not None)
         assert (self.__drop_mine_simulation is not None)
         assert (self.__ship_thrust_simulation is not None)
 
@@ -839,6 +791,8 @@ class DiamondPickaxeController(KesslerController):
 
         assert (stopping_distance >= 0)
 
+        bullet_speed: float = 800
+
         closest_mine_index: None | int = self.__find_closest_mine(ship_position, mines)
         closest_mine_distance: float
         closest_mine_remaining_time: float
@@ -852,15 +806,18 @@ class DiamondPickaxeController(KesslerController):
             closest_mine_distance = sqrt((ship_position[0] - mine_position[0])**2 + (ship_position[1] - mine_position[1])**2)
             closest_mine_remaining_time = mines[closest_mine_index]["remaining_time"]
 
-        closest_asteroid_index: None | int = self.__find_closest_asteroid(ship_position, asteroids)
-        assert (closest_asteroid_index is not None) # the game should have ended if there are no more asteroids
-        closest_asteroid: dict[str, Any] = asteroids[closest_asteroid_index]
-        closest_asteroid_distance: float = sqrt((ship_position[0] - closest_asteroid["position"][0])**2 + (ship_position[1] - closest_asteroid["position"][1])**2)
-        closest_asteroid_radius: float = closest_asteroid["radius"]
-        closest_asteroid_size: int = closest_asteroid["size"]
-        closest_asteroid_position: tuple[float, float] = closest_asteroid["position"]
-        closest_asteroid_velocity: tuple[float, float] = closest_asteroid["velocity"]
-        closest_asteroid_heading: float = atan2(closest_asteroid_velocity[1], closest_asteroid_velocity[0])
+        max_turn_angle_per_frame: float = self.__ship_turn_range[1] / config.FRAME_RATE # (degrees / second) /  (frames / second) = degrees / frame
+        best_next_frame_asteroid_index: int | None = self.__select_best_asteroid_in_angle_range(ship_position, bullet_speed, ship_heading, max_turn_angle_per_frame, asteroids)
+        if (best_next_frame_asteroid_index is None):
+            best_next_frame_asteroid_index = self.__find_closest_asteroid(ship_position, asteroids)
+        assert (best_next_frame_asteroid_index is not None) # the game should have ended if there are no more asteroids
+        best_next_frame_asteroid: dict[str, Any] = asteroids[best_next_frame_asteroid_index]
+        best_next_frame_asteroid_distance: float = sqrt((ship_position[0] - best_next_frame_asteroid["position"][0])**2 + (ship_position[1] - best_next_frame_asteroid["position"][1])**2)
+        best_next_frame_asteroid_radius: float = best_next_frame_asteroid["radius"]
+        best_next_frame_asteroid_size: int = best_next_frame_asteroid["size"]
+        best_next_frame_asteroid_position: tuple[float, float] = best_next_frame_asteroid["position"]
+        best_next_frame_asteroid_velocity: tuple[float, float] = best_next_frame_asteroid["velocity"]
+        best_next_frame_asteroid_heading: float = atan2(best_next_frame_asteroid_velocity[1], best_next_frame_asteroid_velocity[0])
 
         greatest_threat_asteroid_index: None | int = self.__find_greatest_threat_asteroid(ship_position, ship_velocity, safety_margin_ship_radius, asteroids)
         greatest_threat_asteroid: dict[str, Any] | None = None
@@ -876,7 +833,7 @@ class DiamondPickaxeController(KesslerController):
             greatest_threat_asteroid_size: int = greatest_threat_asteroid["size"]
             greatest_threat_asteroid_position: tuple[float, float] = greatest_threat_asteroid["position"]
             greatest_threat_asteroid_velocity: tuple[float, float] = greatest_threat_asteroid["velocity"]
-            greatest_threat_asteroid_heading: float = atan2(closest_asteroid_velocity[1], closest_asteroid_velocity[0])
+            greatest_threat_asteroid_heading: float = atan2(best_next_frame_asteroid_velocity[1], best_next_frame_asteroid_velocity[0])
             asteroid_intercept = self.__calculate_intercept(
                 ship_position,
                 ship_velocity,
@@ -890,24 +847,23 @@ class DiamondPickaxeController(KesslerController):
 
         self.__asteroid_select_simulation.input['greatest_threat_asteroid_threat_time'] = min(greatest_threat_asteroid_threat_time, 100)
         self.__asteroid_select_simulation.input['greatest_threat_asteroid_size'] = greatest_threat_asteroid_size
-        self.__asteroid_select_simulation.input['closest_asteroid_size'] = closest_asteroid_size
+        self.__asteroid_select_simulation.input['best_next_frame_asteroid_size'] = best_next_frame_asteroid_size
         self.__asteroid_select_simulation.compute()
 
         selected_asteroid_position: tuple[float, float]
         selected_asteroid_velocity: tuple[float, float]
         try:
-            if (greatest_threat_asteroid is None or self.__asteroid_select_simulation.output['asteroid_selection'] < 0): # TODO find asteroid with least turning to hit
-                selected_asteroid_position = closest_asteroid_position # TODO try to only shoot the smallest asteroids and just dodge the big ones?
-                selected_asteroid_velocity = closest_asteroid_velocity
+            if (greatest_threat_asteroid is None or self.__asteroid_select_simulation.output['asteroid_selection'] < 0):
+                selected_asteroid_position = best_next_frame_asteroid_position
+                selected_asteroid_velocity = best_next_frame_asteroid_velocity
             else:
                 selected_asteroid_position = greatest_threat_asteroid_position
                 selected_asteroid_velocity = greatest_threat_asteroid_velocity
         except KeyError:
             #print("error in asteroid selection")
-            selected_asteroid_position = closest_asteroid_position
-            selected_asteroid_velocity = closest_asteroid_velocity
+            selected_asteroid_position = best_next_frame_asteroid_position
+            selected_asteroid_velocity = best_next_frame_asteroid_velocity
 
-        bullet_speed: float = 800
         target_ship_firing_heading: float = self.__calculate_bullet_intercept(ship_position, bullet_speed, selected_asteroid_position, selected_asteroid_velocity)
 
         # Lastly, find the difference betwwen firing angle and the ship's current orientation.
@@ -918,8 +874,6 @@ class DiamondPickaxeController(KesslerController):
 
         # Pass the inputs to the rulebase and fire it
 
-        self.__ship_fire_simulation.input['greatest_threat_asteroid_threat_time'] = greatest_threat_asteroid_threat_time
-        self.__ship_fire_simulation.input['ship_is_invincible'] = int(ship_is_respawning)
         self.__drop_mine_simulation.input['greatest_threat_asteroid_threat_time'] = greatest_threat_asteroid_threat_time
         self.__drop_mine_simulation.input['ship_is_invincible'] = int(ship_is_respawning)
         self.__ship_thrust_simulation.input['greatest_threat_asteroid_threat_time'] = greatest_threat_asteroid_threat_time
@@ -931,15 +885,7 @@ class DiamondPickaxeController(KesslerController):
         turn_rate: float = degrees(target_ship_firing_heading_delta) * config.FRAME_RATE
         turn_rate = min(max(self.__ship_turn_range[0], turn_rate), self.__ship_turn_range[1])
 
-        fire: bool
-        try:
-            self.__ship_fire_simulation.compute()
-            if self.__ship_fire_simulation.output['ship_fire'] >= 0:
-                fire = True
-            else:
-                fire = False
-        except (ValueError, KeyError):
-            fire = True
+        fire: bool = True
 
         drop_mine: bool
         try:
@@ -1070,7 +1016,7 @@ class DiamondPickaxeController(KesslerController):
         return target_ship_firing_heading
 
     @staticmethod
-    def __calculate_intercept( # FIXME make aware of screen wrapping
+    def __calculate_intercept(
         position_1: tuple[float, float],
         velocity_1: tuple[float, float],
         radius_1: float,
@@ -1183,6 +1129,103 @@ class DiamondPickaxeController(KesslerController):
         assert ((closest_asteroid_distance is None) == (closest_asteroid_index is None))
 
         return closest_asteroid_index
+
+    @staticmethod
+    def __find_asteroids_in_angle_range(
+        ship_position: tuple[float, float],
+        bullet_speed: float,
+        ship_heading_radians: float,
+        max_heading_change_per_frame_radians: float,
+        asteroids: list[dict[str, Any]]
+    ) -> list[int]:
+        """
+        returns the list of asteroids that can possibly be targeted in the next frame,
+        obviously the list will be empty if there is no such asteroid
+        """
+        # two lines are drawn from the ship's position, representing the extremeties of headings it can aim at
+        # on the next frame.
+        # asteroids must be between these two lines, and they must be in the direction that the ship is facing as well,
+        # (not behind it)
+        assert (ship_heading_radians >= 0)
+        assert (ship_heading_radians <= 2*pi)
+
+        asteroids_in_angle_range: list[int] = []
+        for index, asteroid in enumerate(asteroids):
+            asteroid_position: tuple[float, float] = asteroid["position"]
+            asteroid_velocity: tuple[float, float] = asteroid["velocity"]
+            ship_firing_angle: float = DiamondPickaxeController.__calculate_bullet_intercept(
+                ship_position,
+                bullet_speed,
+                asteroid_position,
+                asteroid_velocity
+            )
+
+            heading_delta: float = ship_firing_angle - ship_heading_radians
+            heading_delta = (heading_delta + pi) % (2 * pi) - pi # wrap angles to between -pi and pi
+            if abs(heading_delta) < max_heading_change_per_frame_radians:
+                asteroids_in_angle_range.append(index)
+
+        return asteroids_in_angle_range
+
+    @staticmethod
+    def __select_best_asteroid_in_angle_range(
+        ship_position: tuple[float, float],
+        bullet_speed: float,
+        ship_heading_radians: float,
+        max_heading_change_per_frame_radians: float,
+        asteroids: list[dict[str, Any]]
+    ) -> int | None:
+        """
+        returns the index of the best asteroid to target in the given angle range,
+        returns None if there are no asteroids in the angle range.
+
+        Selects the asteroid with the smallest size and least angle to turn the ship
+        """
+        asteroids_in_angle_range_indices: list[int] = DiamondPickaxeController.__find_asteroids_in_angle_range(
+            ship_position,
+            bullet_speed,
+            ship_heading_radians,
+            max_heading_change_per_frame_radians,
+            asteroids
+        )
+        best_asteroid_index: int | None = None
+        best_asteroid_size: int | None = None
+        best_asteroid_angle_delta: float | None = None
+        for index in asteroids_in_angle_range_indices:
+            asteroid: dict[str, Any] = asteroids[index]
+            asteroid_size: int = asteroid["size"]
+            asteroid_position: tuple[float, float] = asteroid["position"]
+            asteroid_velocity: tuple[float, float] = asteroid["velocity"]
+            ship_firing_angle: float = DiamondPickaxeController.__calculate_bullet_intercept(
+                ship_position,
+                bullet_speed,
+                asteroid_position,
+                asteroid_velocity
+            )
+            heading_delta: float = ship_firing_angle - ship_heading_radians
+            heading_delta = (heading_delta + pi) % (2 * pi) - pi # wrap angles to between -pi and pi
+            heading_delta = abs(heading_delta)
+
+            if (best_asteroid_index is None):
+                best_asteroid_index = index
+                best_asteroid_size = asteroid_size
+                best_asteroid_angle_delta = heading_delta
+                continue
+
+            assert (best_asteroid_index is not None)
+            assert (best_asteroid_size is not None)
+            assert (best_asteroid_angle_delta is not None)
+
+            if asteroid_size < best_asteroid_size:
+                best_asteroid_index = index
+                best_asteroid_size = asteroid_size
+                best_asteroid_angle_delta = heading_delta
+            if asteroid_size == best_asteroid_angle_delta and heading_delta < best_asteroid_angle_delta:
+                best_asteroid_index = index
+                best_asteroid_size = asteroid_size
+                best_asteroid_angle_delta = heading_delta
+
+        return best_asteroid_index
 
     @staticmethod
     def __find_greatest_threat_asteroid(
