@@ -806,8 +806,8 @@ class DiamondPickaxeController(KesslerController):
             closest_mine_distance = sqrt((ship_position[0] - mine_position[0])**2 + (ship_position[1] - mine_position[1])**2)
             closest_mine_remaining_time = mines[closest_mine_index]["remaining_time"]
 
-        max_turn_angle_per_frame: float = self.__ship_turn_range[1] / config.FRAME_RATE # (degrees / second) /  (frames / second) = degrees / frame
-        best_next_frame_asteroid_index: int | None = self.__select_best_asteroid_in_angle_range(ship_position, bullet_speed, ship_heading, max_turn_angle_per_frame, asteroids)
+        max_turn_angle_per_frame_radians: float = radians(self.__ship_turn_range[1]) / config.FRAME_RATE # (degrees / second) /  (frames / second) = degrees / frame
+        best_next_frame_asteroid_index: int | None = self.__select_best_asteroid_in_angle_range(ship_position, bullet_speed, ship_heading, max_turn_angle_per_frame_radians, asteroids)
         if (best_next_frame_asteroid_index is None):
             best_next_frame_asteroid_index = self.__find_closest_asteroid(ship_position, asteroids)
         assert (best_next_frame_asteroid_index is not None) # the game should have ended if there are no more asteroids
