@@ -855,7 +855,7 @@ class DiamondPickaxeController(KesslerController):
             closest_mine_remaining_time = mines[closest_mine_index]["remaining_time"]
 
         max_turn_angle_per_frame_radians: float = radians(self.__ship_turn_range[1]) / config.FRAME_RATE # (degrees / second) /  (frames / second) = degrees / frame
-        best_next_frame_asteroid_index: int | None = self.__select_best_asteroid_in_angle_range(ship_position, bullet_speed, ship_heading, max_turn_angle_per_frame_radians, asteroids)
+        best_next_frame_asteroid_index: int | None = self.__select_best_asteroid_in_angle_range(ship_position, bullet_speed, ship_heading, max_turn_angle_per_frame_radians, asteroids, game_map_size)
         if (best_next_frame_asteroid_index is None):
             best_next_frame_asteroid_index = self.__find_closest_asteroid(ship_position, asteroids)
         assert (best_next_frame_asteroid_index is not None) # the game should have ended if there are no more asteroids
@@ -912,10 +912,17 @@ class DiamondPickaxeController(KesslerController):
             selected_asteroid_position = best_next_frame_asteroid_position
             selected_asteroid_velocity = best_next_frame_asteroid_velocity
 
-        target_ship_firing_heading: float = self.__calculate_bullet_intercept(ship_position, bullet_speed, selected_asteroid_position, selected_asteroid_velocity)
+        target_ship_firing_heading: float | None = self.__calculate_bullet_intercept(ship_position, bullet_speed, selected_asteroid_position, selected_asteroid_velocity, game_map_size)
 
         # Lastly, find the difference betwwen firing angle and the ship's current orientation.
-        target_ship_firing_heading_delta: float = target_ship_firing_heading - ship_heading
+        target_ship_firing_heading_delta: float
+        if target_ship_firing_heading is None:
+            # this should never normally happen, as the selected asteroid should not be an impossible target,
+            # but it is possible that there are no possible targets that can be hit within the game screen,
+            # and in that case this may happen, and the direction and amount we want to turn the ship is unknown
+            target_ship_firing_heading_delta = 0
+        else:
+            target_ship_firing_heading_delta = target_ship_firing_heading - ship_heading
 
         # Wrap all angles to (-pi, pi)
         target_ship_firing_heading_delta = (target_ship_firing_heading_delta + pi) % (2 * pi) - pi
@@ -935,7 +942,7 @@ class DiamondPickaxeController(KesslerController):
 
         fire: bool
         if config.CONSERVE_BULLETS:
-            if int(ideal_turn_rate*10000) == int(turn_rate*10000):
+            if int(ideal_turn_rate*1000000) == int(turn_rate*1000000):
                 # if they are close enough to a few decimal places, then we have turned as much as we wanted to,
                 # and are aiming exactly where we need to to hit an asteroid
                 fire = True
@@ -1033,10 +1040,13 @@ class DiamondPickaxeController(KesslerController):
         ship_position: tuple[float, float],
         bullet_speed: float,
         asteroid_position: tuple[float, float],
-        asteroid_velocity: tuple[float, float]
-    ) -> float:
+        asteroid_velocity: tuple[float, float],
+        map_size: tuple[int, int]
+    ) -> float | None:
         """
-        returns the target ship firing heading (radians)
+        returns the target ship firing heading (radians),
+        returns None if it is impossible for the ship to shoot the asteroid within
+        the borders of the screen, or at all
         """
         position_delta: tuple[float, float] = (ship_position[0] - asteroid_position[0], ship_position[1] - asteroid_position[1])
         distance: float = sqrt(position_delta[0]**2 + position_delta[1]**2)
@@ -1048,18 +1058,23 @@ class DiamondPickaxeController(KesslerController):
         speed_1: float = bullet_speed
         speed_2: float = sqrt(asteroid_velocity[0]**2 + asteroid_velocity[1]**2)
 
+        if speed_1 == speed_2:
+            # this would result in a division by 0 error in the normal method of solving the equations
+            # FIXME need a different way to find intercept when the speeds are exactly the same
+            return None
+
         # Determinant of the quadratic formula b^2-4ac
         targ_det: float = (-2 * distance * speed_2 * cos_my_theta2)**2 - (4*(speed_2**2 - speed_1**2) * distance**2)
 
         assert (targ_det >= 0)
 
-        if (speed_2**2 - speed_1**2) == 0:
-            # no intercept, avoids division by 0
-            return 10000
-
         # Combine the Law of Cosines with the quadratic formula for solve for intercept time. Remember, there are two values produced.
         intrcpt1: float = ((2 * distance * speed_2 * cos_my_theta2) + sqrt(targ_det)) / (2 * (speed_2**2 - speed_1**2))
         intrcpt2: float = ((2 * distance * speed_2 * cos_my_theta2) - sqrt(targ_det)) / (2 * (speed_2**2 - speed_1**2))
+
+        if (intrcpt1 < 0 and intrcpt2 < 0):
+            # it is impossible to hit the asteroid, there are no intercepts with positive time
+            return None
 
         # Take the smaller intercept time, as long as it is positive; if not, take the larger one.
         time: float
@@ -1078,6 +1093,10 @@ class DiamondPickaxeController(KesslerController):
             asteroid_position[0] + asteroid_velocity[0] * (time+1/30),
             asteroid_position[1] + asteroid_velocity[1] * (time+1/30)
         )
+
+        if (intercept[0] <= 0 or intercept[1] <= 0 or intercept[0] >= map_size[0] or intercept[1] >= map_size[1]):
+            # bullet would intercept asteroid outside of the game map bounds, so it would not hit due to game mechanics
+            return None
 
         target_ship_firing_heading: float = atan2((intercept[1] - ship_position[1]), (intercept[0] - ship_position[0]))
 
@@ -1204,7 +1223,8 @@ class DiamondPickaxeController(KesslerController):
         bullet_speed: float,
         ship_heading_radians: float,
         max_heading_change_per_frame_radians: float,
-        asteroids: list[dict[str, Any]]
+        asteroids: list[dict[str, Any]],
+        map_size: tuple[int, int]
     ) -> list[int]:
         """
         returns the list of asteroids that can possibly be targeted in the next frame,
@@ -1221,17 +1241,19 @@ class DiamondPickaxeController(KesslerController):
         for index, asteroid in enumerate(asteroids):
             asteroid_position: tuple[float, float] = asteroid["position"]
             asteroid_velocity: tuple[float, float] = asteroid["velocity"]
-            ship_firing_angle: float = DiamondPickaxeController.__calculate_bullet_intercept(
+            ship_firing_angle: float | None = DiamondPickaxeController.__calculate_bullet_intercept(
                 ship_position,
                 bullet_speed,
                 asteroid_position,
-                asteroid_velocity
+                asteroid_velocity,
+                map_size
             )
 
-            heading_delta: float = ship_firing_angle - ship_heading_radians
-            heading_delta = (heading_delta + pi) % (2 * pi) - pi # wrap angles to between -pi and pi
-            if abs(heading_delta) < max_heading_change_per_frame_radians:
-                asteroids_in_angle_range.append(index)
+            if ship_firing_angle is not None:
+                heading_delta: float = ship_firing_angle - ship_heading_radians
+                heading_delta = (heading_delta + pi) % (2 * pi) - pi # wrap angles to between -pi and pi
+                if abs(heading_delta) < max_heading_change_per_frame_radians:
+                    asteroids_in_angle_range.append(index)
 
         return asteroids_in_angle_range
 
@@ -1241,7 +1263,8 @@ class DiamondPickaxeController(KesslerController):
         bullet_speed: float,
         ship_heading_radians: float,
         max_heading_change_per_frame_radians: float,
-        asteroids: list[dict[str, Any]]
+        asteroids: list[dict[str, Any]],
+        map_size: tuple[int, int]
     ) -> int | None:
         """
         returns the index of the best asteroid to target in the given angle range,
@@ -1254,7 +1277,8 @@ class DiamondPickaxeController(KesslerController):
             bullet_speed,
             ship_heading_radians,
             max_heading_change_per_frame_radians,
-            asteroids
+            asteroids,
+            map_size
         )
         best_asteroid_index: int | None = None
         best_asteroid_size: int | None = None
@@ -1264,34 +1288,37 @@ class DiamondPickaxeController(KesslerController):
             asteroid_size: int = asteroid["size"]
             asteroid_position: tuple[float, float] = asteroid["position"]
             asteroid_velocity: tuple[float, float] = asteroid["velocity"]
-            ship_firing_angle: float = DiamondPickaxeController.__calculate_bullet_intercept(
+            ship_firing_angle: float | None = DiamondPickaxeController.__calculate_bullet_intercept(
                 ship_position,
                 bullet_speed,
                 asteroid_position,
-                asteroid_velocity
+                asteroid_velocity,
+                map_size
             )
-            heading_delta: float = ship_firing_angle - ship_heading_radians
-            heading_delta = (heading_delta + pi) % (2 * pi) - pi # wrap angles to between -pi and pi
-            heading_delta = abs(heading_delta)
 
-            if (best_asteroid_index is None):
-                best_asteroid_index = index
-                best_asteroid_size = asteroid_size
-                best_asteroid_angle_delta = heading_delta
-                continue
+            if ship_firing_angle is not None:
+                heading_delta: float = ship_firing_angle - ship_heading_radians
+                heading_delta = (heading_delta + pi) % (2 * pi) - pi # wrap angles to between -pi and pi
+                heading_delta = abs(heading_delta)
 
-            assert (best_asteroid_index is not None)
-            assert (best_asteroid_size is not None)
-            assert (best_asteroid_angle_delta is not None)
+                if (best_asteroid_index is None):
+                    best_asteroid_index = index
+                    best_asteroid_size = asteroid_size
+                    best_asteroid_angle_delta = heading_delta
+                    continue
 
-            if asteroid_size > best_asteroid_size:
-                best_asteroid_index = index
-                best_asteroid_size = asteroid_size
-                best_asteroid_angle_delta = heading_delta
-            if asteroid_size == best_asteroid_angle_delta and heading_delta < best_asteroid_angle_delta:
-                best_asteroid_index = index
-                best_asteroid_size = asteroid_size
-                best_asteroid_angle_delta = heading_delta
+                assert (best_asteroid_index is not None)
+                assert (best_asteroid_size is not None)
+                assert (best_asteroid_angle_delta is not None)
+
+                if asteroid_size > best_asteroid_size:
+                    best_asteroid_index = index
+                    best_asteroid_size = asteroid_size
+                    best_asteroid_angle_delta = heading_delta
+                if asteroid_size == best_asteroid_angle_delta and heading_delta < best_asteroid_angle_delta:
+                    best_asteroid_index = index
+                    best_asteroid_size = asteroid_size
+                    best_asteroid_angle_delta = heading_delta
 
         return best_asteroid_index
 
