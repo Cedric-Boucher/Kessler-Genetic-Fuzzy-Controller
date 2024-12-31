@@ -336,6 +336,22 @@ class DiamondPickaxeController(KesslerController):
             self.__ship_is_invincible_range[1]
         )
 
+        start_gene_index = end_gene_index
+        genes_needed = 2
+        end_gene_index = start_gene_index + genes_needed
+        values: list[float] = chromosome_list[start_gene_index:end_gene_index]
+        values.extend([-0.01, 1.01])
+        values = sorted(values)
+        ship_fire_gene: Gene = { # type: ignore
+            "N": tuple(values[0:3]),
+            "Y": tuple(values[1:4])
+        }
+        ship_fire_gene = self.__scale_gene(
+            ship_fire_gene,
+            self.__ship_fire_range[0],
+            self.__ship_fire_range[1]
+        )
+
         self.__converted_chromosome = {
             "ship_distance_from_nearest_edge": ship_distance_from_nearest_edge_gene,
             "target_ship_firing_heading_delta": target_ship_firing_heading_delta_gene,
@@ -348,6 +364,7 @@ class DiamondPickaxeController(KesslerController):
             "best_next_frame_asteroid_size": best_next_frame_asteroid_size_gene,
             "closest_mine_remaining_time": closest_mine_remaining_time_gene,
             "asteroid_selection": asteroid_selection_gene,
+            "ship_fire": ship_fire_gene,
             "drop_mine": drop_mine_gene,
             "ship_thrust": ship_thrust_gene,
             "ship_is_invincible": ship_is_invincible_gene
@@ -375,6 +392,7 @@ class DiamondPickaxeController(KesslerController):
         self.__ship_is_invincible = ctrl.Antecedent(np.arange(self.__ship_is_invincible_range[0], self.__ship_is_invincible_range[1], 0.1), 'ship_is_invincible')
 
         self.__asteroid_selection = ctrl.Consequent(np.arange(self.__asteroid_selection_range[0], self.__asteroid_selection_range[1], 0.1), 'asteroid_selection')
+        self.__ship_fire = ctrl.Consequent(np.arange(self.__ship_fire_range[0], self.__ship_fire_range[1], 0.1), 'ship_fire')
         self.__drop_mine = ctrl.Consequent(np.arange(self.__ship_drop_mine_range[0], self.__ship_drop_mine_range[1], 0.1), 'drop_mine')
         self.__ship_thrust = ctrl.Consequent(np.arange(self.__ship_thrust_range[0], self.__ship_thrust_range[1], 5), 'ship_thrust')
 
@@ -394,6 +412,7 @@ class DiamondPickaxeController(KesslerController):
         assert (self.__best_next_frame_asteroid_distance is not None)
         assert (self.__best_next_frame_asteroid_size is not None)
         assert (self.__asteroid_selection is not None)
+        assert (self.__ship_fire is not None)
         assert (self.__drop_mine is not None)
         assert (self.__ship_thrust is not None)
         assert (self.__ship_is_invincible is not None)
@@ -473,6 +492,10 @@ class DiamondPickaxeController(KesslerController):
         self.__asteroid_selection['closest'] = fuzz.trimf(self.__asteroid_selection.universe, asteroid_selection_gene["closest"])
         self.__asteroid_selection['greatest_threat'] = fuzz.trimf(self.__asteroid_selection.universe, asteroid_selection_gene["greatest_threat"])
 
+        ship_fire_gene: Gene = self.__converted_chromosome["ship_fire"]
+        self.__ship_fire['N'] = fuzz.trimf(self.__ship_fire.universe, ship_fire_gene["N"])
+        self.__ship_fire['Y'] = fuzz.trimf(self.__ship_fire.universe, ship_fire_gene["Y"])
+
         drop_mine_gene: Gene = self.__converted_chromosome["drop_mine"]
         self.__drop_mine['N'] = fuzz.trimf(self.__drop_mine.universe, drop_mine_gene["N"])
         self.__drop_mine['Y'] = fuzz.trimf(self.__drop_mine.universe, drop_mine_gene["Y"])
@@ -499,6 +522,7 @@ class DiamondPickaxeController(KesslerController):
         assert (self.__best_next_frame_asteroid_distance is not None)
         assert (self.__best_next_frame_asteroid_size is not None)
         assert (self.__asteroid_selection is not None)
+        assert (self.__ship_fire is not None)
         assert (self.__drop_mine is not None)
         assert (self.__ship_thrust is not None)
         assert (self.__ship_is_invincible is not None)
@@ -658,6 +682,21 @@ class DiamondPickaxeController(KesslerController):
             )
         ]
 
+        self.__ship_fire_fuzzy_rules = [
+            ctrl.Rule(
+                self.__ship_is_invincible['N'],
+                self.__ship_fire['Y']
+            ),
+            ctrl.Rule(
+                self.__ship_is_invincible['Y'] & (self.__greatest_threat_asteroid_threat_time['XS'] | self.__greatest_threat_asteroid_threat_time['S'] | self.__greatest_threat_asteroid_threat_time['M']),
+                self.__ship_fire['N']
+            ),
+            ctrl.Rule(
+                self.__ship_is_invincible['Y'] & (self.__greatest_threat_asteroid_threat_time['L'] | self.__greatest_threat_asteroid_threat_time['XL']),
+                self.__ship_fire['Y']
+            )
+        ]
+
         self.__drop_mine_fuzzy_rules = [
             ctrl.Rule(
                 self.__ship_is_invincible['Y'],
@@ -723,12 +762,20 @@ class DiamondPickaxeController(KesslerController):
     def __setup_simulations(self) -> None:
         self.__setup_fuzzy_rules()
         assert (self.__asteroid_select_fuzzy_rules is not None)
+        assert (self.__ship_fire_fuzzy_rules is not None)
         assert (self.__drop_mine_fuzzy_rules is not None)
         assert (self.__ship_thrust_fuzzy_rules is not None)
 
         asteroid_select = ctrl.ControlSystem(self.__asteroid_select_fuzzy_rules)
         self.__asteroid_select_simulation = ctrl.ControlSystemSimulation(
             asteroid_select,
+            cache=config.USE_SIMULATION_CACHE,
+            flush_after_run=config.FLUSH_SIMULATION_CACHE_AFTER_RUN
+        )
+
+        ship_fire = ctrl.ControlSystem(self.__ship_fire_fuzzy_rules)
+        self.__ship_fire_simulation = ctrl.ControlSystemSimulation(
+            ship_fire,
             cache=config.USE_SIMULATION_CACHE,
             flush_after_run=config.FLUSH_SIMULATION_CACHE_AFTER_RUN
         )
@@ -752,6 +799,7 @@ class DiamondPickaxeController(KesslerController):
         Method processed each time step by this controller.
         """
         assert (self.__asteroid_select_simulation is not None)
+        assert (self.__ship_fire_simulation is not None)
         assert (self.__drop_mine_simulation is not None)
         assert (self.__ship_thrust_simulation is not None)
 
@@ -885,7 +933,15 @@ class DiamondPickaxeController(KesslerController):
         turn_rate: float = degrees(target_ship_firing_heading_delta) * config.FRAME_RATE
         turn_rate = min(max(self.__ship_turn_range[0], turn_rate), self.__ship_turn_range[1])
 
-        fire: bool = True
+        fire: bool
+        try:
+            self.__ship_fire_simulation.compute()
+            if self.__ship_fire_simulation.output['ship_fire'] >= 0:
+                fire = True
+            else:
+                fire = False
+        except (ValueError, KeyError):
+            fire = True
 
         drop_mine: bool
         try:
@@ -1216,7 +1272,7 @@ class DiamondPickaxeController(KesslerController):
             assert (best_asteroid_size is not None)
             assert (best_asteroid_angle_delta is not None)
 
-            if asteroid_size < best_asteroid_size:
+            if asteroid_size > best_asteroid_size:
                 best_asteroid_index = index
                 best_asteroid_size = asteroid_size
                 best_asteroid_angle_delta = heading_delta
