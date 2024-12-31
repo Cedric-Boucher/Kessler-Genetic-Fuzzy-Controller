@@ -98,7 +98,7 @@ def fitness_for_pygad(ga_instance: pygad.GA, chromosome: Chromosome, solution_id
 
 def on_generation(ga_instance: pygad.GA):
     ga_instance.save(config.GA_MODEL_FILE)
-    print("Generation: {:d}".format(ga_instance.generations_completed))
+    print("Generation {:d} completed".format(ga_instance.generations_completed))
     print("Fitness of best solution: {:.2f}".format(ga_instance.best_solution(ga_instance.last_generation_fitness)[1]))
     if check_stop_flag():
         print("Detected change in stop flag file, ending")
