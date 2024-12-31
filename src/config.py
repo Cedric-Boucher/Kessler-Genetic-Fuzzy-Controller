@@ -8,6 +8,8 @@ LOG_FILE_PATH: str = "./KesslerController.log"
 USE_SIMULATION_CACHE: bool = True # default is True
 FLUSH_SIMULATION_CACHE_AFTER_RUN: int = 1000 # default is 1000
 
+CONSERVE_BULLETS: bool = False
+
 MAP_SIZE: tuple[int, int] = (3400, 2000)
 LIVES: int = 3
 MINES: int = 3

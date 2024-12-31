@@ -930,18 +930,30 @@ class DiamondPickaxeController(KesslerController):
         self.__ship_thrust_simulation.input['closest_mine_remaining_time'] = closest_mine_remaining_time
         self.__ship_thrust_simulation.input['target_ship_firing_heading_delta'] = target_ship_firing_heading_delta
 
-        turn_rate: float = degrees(target_ship_firing_heading_delta) * config.FRAME_RATE
-        turn_rate = min(max(self.__ship_turn_range[0], turn_rate), self.__ship_turn_range[1])
+        ideal_turn_rate: float = degrees(target_ship_firing_heading_delta) * config.FRAME_RATE
+        turn_rate: float = min(max(self.__ship_turn_range[0], ideal_turn_rate), self.__ship_turn_range[1])
 
         fire: bool
-        try:
-            self.__ship_fire_simulation.compute()
-            if self.__ship_fire_simulation.output['ship_fire'] >= 0:
+        if config.CONSERVE_BULLETS:
+            if int(ideal_turn_rate*10000) == int(turn_rate*10000):
+                # if they are close enough to a few decimal places, then we have turned as much as we wanted to,
+                # and are aiming exactly where we need to to hit an asteroid
                 fire = True
             else:
+                # we are highly unlikely to be able to hit an asteroid if we shoot now, so we don't shoot
                 fire = False
-        except (ValueError, KeyError):
+        else:
+            # always fire, no need to conserve bullets
             fire = True
+
+        if fire: # if we aren't planning to fire, no need to waste resources computing fuzzy simulation
+            try:
+                self.__ship_fire_simulation.compute()
+                if self.__ship_fire_simulation.output['ship_fire'] < 0:
+                    fire = False
+            except (ValueError, KeyError):
+                # default to not firing if an error occurred
+                fire = False
 
         drop_mine: bool
         try:
