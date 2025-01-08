@@ -1121,6 +1121,11 @@ class DiamondPickaxeController(KesslerController):
         position_delta: tuple[float, float] = (position_1[0] - position_2[0], position_1[1] - position_2[1])
         velocity_delta: tuple[float, float] = (velocity_1[0] - velocity_2[0], velocity_1[1] - velocity_2[1])
 
+        distance: float = sqrt(position_delta[0] ** 2 + position_delta[1] ** 2)
+        if (distance <= radius_1 + radius_2):
+            # the two objects are currently inside of each other and currently colliding
+            return (position_1, position_2, 0)
+
         # the distance between the centers of the objects as a function of time t is given by:
         # d(t) = sqrt( (delta_x + delta_v_x * t)**2 + (delta_y + delta_v_y * t)**2 )
         # collision if d(t) <= radius_1 + radius_2
