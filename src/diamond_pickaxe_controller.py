@@ -936,6 +936,8 @@ class DiamondPickaxeController(KesslerController):
         self.__ship_thrust_simulation.input['closest_mine_distance'] = closest_mine_distance
         self.__ship_thrust_simulation.input['closest_mine_remaining_time'] = closest_mine_remaining_time
         self.__ship_thrust_simulation.input['target_ship_firing_heading_delta'] = target_ship_firing_heading_delta
+        self.__ship_fire_simulation.input['ship_is_invincible'] = 1 if ship_is_respawning else -1
+        self.__ship_fire_simulation.input['greatest_threat_asteroid_threat_time'] = min(greatest_threat_asteroid_threat_time, 100)
 
         ideal_turn_rate: float = degrees(target_ship_firing_heading_delta) * config.FRAME_RATE
         turn_rate: float = min(max(self.__ship_turn_range[0], ideal_turn_rate), self.__ship_turn_range[1])
