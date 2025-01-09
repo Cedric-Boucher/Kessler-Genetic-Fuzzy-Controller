@@ -1066,7 +1066,7 @@ class DiamondPickaxeController(KesslerController):
             return None
 
         # Determinant of the quadratic formula b^2-4ac
-        targ_det: float = (-2 * distance * speed_2 * cos_my_theta2)**2 - (4*(speed_2**2 - speed_1**2) * distance**2)
+        targ_det: float = (2 * distance * speed_2 * cos_my_theta2)**2 - (4*(speed_2**2 - speed_1**2) * distance**2)
 
         assert (targ_det >= 0)
 
