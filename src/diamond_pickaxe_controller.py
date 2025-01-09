@@ -1068,7 +1068,8 @@ class DiamondPickaxeController(KesslerController):
         # Determinant of the quadratic formula b^2-4ac
         targ_det: float = (2 * distance * speed_2 * cos_my_theta2)**2 - (4*(speed_2**2 - speed_1**2) * distance**2)
 
-        assert (targ_det >= 0)
+        if (targ_det < 0):
+            return None
 
         # Combine the Law of Cosines with the quadratic formula for solve for intercept time. Remember, there are two values produced.
         intrcpt1: float = ((2 * distance * speed_2 * cos_my_theta2) + sqrt(targ_det)) / (2 * (speed_2**2 - speed_1**2))
